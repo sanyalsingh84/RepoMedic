@@ -66,8 +66,35 @@ export class TicketService {
         });
 
         console.log(`✅ RAG complete for ${ticket.sourceIssueKey}. Found ${relevantFiles.length} relevant files.`);
+
+        // 4. Generate Code Fix Suggestion
+        if (relevantFiles.length > 0) {
+          console.log(`🛠️ Generating suggestion for ${ticket.sourceIssueKey}...`);
+          
+          // Fetch actual content for the selected files
+          const contextFiles = await Promise.all(
+            relevantFiles.map(async (filePath) => {
+              return await ragService.getFileContent(filePath);
+            })
+          );
+
+          // Filter out files that couldn't be read (null)
+          const validContext = contextFiles.filter((f): f is { path: string; content: string } => f !== null);
+
+          if (validContext.length > 0) {
+            const suggestion = await aiAssistant.generateFix(normalized, validContext);
+            
+            // Update ticket with the suggestion
+            ticket = await prisma.ticket.update({
+              where: { id: ticket.id },
+              data: { suggestion: suggestion as any }
+            });
+
+            console.log(`✅ Suggestion generated for ${ticket.sourceIssueKey}.`);
+          }
+        }
       } catch (error) {
-        console.error(`❌ RAG failed for ${ticket.sourceIssueKey}:`, error);
+        console.error(`❌ RAG/Suggestion failed for ${ticket.sourceIssueKey}:`, error);
       }
     }
 

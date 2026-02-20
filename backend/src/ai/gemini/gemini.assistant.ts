@@ -50,8 +50,43 @@ export class GeminiAssistant implements AIAssistant {
   }
 
   async generateFix(ticket: NormalizedTicket, contextFiles: { path: string; content: string }[]): Promise<FixSuggestion> {
-    // To be implemented in later step of Phase 2
-    throw new Error("Method not implemented.");
+    const fileSnippets = contextFiles
+      .map(f => `File: ${f.path}\nContent:\n${f.content}\n---`)
+      .join("\n\n");
+
+    const prompt = `
+      You are a senior software engineer. Provide a minimal, scoped code change suggestion to fix the following bug.
+      Do not include unrelated refactors. Prefer diffs.
+
+      Bug Report:
+      - Summary: ${ticket.summary}
+      - Description: ${ticket.description}
+
+      Relevant Source Files:
+      ${fileSnippets}
+
+      Constraints:
+      - Keep changes minimal
+      - Human review required
+
+      Output:
+      - A unified diff (git-style)
+      - No explanations
+      - No markdown fences
+      - No extra commentary
+      - Only the diff
+    `;
+
+    console.log(`🤖 Generating fix for ${ticket.issueKey} using Gemini...`);
+    
+    // For code generation, we use gemini-1.5-pro for better reasoning
+    const proModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const result = await proModel.generateContent(prompt);
+    const text = result.response.text();
+
+    return {
+      diff: text.trim()
+    };
   }
 
   async selectRelevantFiles(ticket: NormalizedTicket, filePaths: string[]): Promise<string[]> {

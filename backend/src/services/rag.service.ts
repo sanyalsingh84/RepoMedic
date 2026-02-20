@@ -1,7 +1,6 @@
-import { execSync } from "child_process";
-import fs from "fs";
 import path from "path";
 import { env } from "../config/env.js";
+import { repository } from "../repo/repository.factory.js";
 
 export interface SourceFile {
   path: string;
@@ -9,26 +8,12 @@ export interface SourceFile {
 }
 
 export class RAGService {
-  private rootDir: string;
-
-  constructor() {
-    try {
-      // Reliable Git root detection
-      this.rootDir = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
-    } catch (error) {
-      console.warn("⚠️ Not in a git repository, falling back to parent directory.");
-      this.rootDir = path.resolve(process.cwd(), "..");
-    }
-  }
-
   /**
-   * Discover all git-tracked files that match our RAG criteria
+   * Discover all files from the source that match our RAG criteria
    */
   public async discoverFiles(): Promise<string[]> {
     try {
-      // Use -z to handle filenames with spaces/special characters safely
-      const output = execSync("git ls-files -z", { cwd: this.rootDir }).toString();
-      const allFiles = output.split("\0").map(f => f.trim()).filter(Boolean);
+      const allFiles = await repository.getTrackedFiles();
 
       // Filter by extension and exclude patterns
       return allFiles.filter(file => {
@@ -42,27 +27,19 @@ export class RAGService {
         return isIncluded && !isExcluded;
       });
     } catch (error) {
-      console.error("❌ Failed to discover git files:", error);
+      console.error("❌ Failed to discover repository files:", error);
       return [];
     }
   }
 
   /**
-   * Read the content of a specific file with safety guardrails
+   * Read the content of a specific file from the repository source
    */
-  public getFileContent(filePath: string): SourceFile | null {
+  public async getFileContent(filePath: string): Promise<SourceFile | null> {
     try {
-      const fullPath = path.join(this.rootDir, filePath);
-      if (!fs.existsSync(fullPath)) return null;
-
-      // File Size Guardrail: Skip files larger than 50KB
-      const stats = fs.statSync(fullPath);
-      if (stats.size > 50_000) {
-        console.warn(`⏩ Skipping large file: ${filePath} (${stats.size} bytes)`);
-        return null;
-      }
+      const content = await repository.getFileContent(filePath);
+      if (content === null) return null;
       
-      const content = fs.readFileSync(fullPath, "utf-8");
       return { path: filePath, content };
     } catch (error) {
       console.error(`❌ Failed to read file ${filePath}:`, error);

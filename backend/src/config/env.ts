@@ -9,6 +9,12 @@ export const env = {
   googleApiKey: process.env.GOOGLE_GENAI_API_KEY,
   aiMode: (process.env.AI_MODE || "local") as "local" | "cloud",
   ollamaModel: process.env.OLLAMA_MODEL || "deepseek-coder:6.7b",
+  
+  // Repository Configuration
+  repoMode: (process.env.REPO_MODE || "local") as "local" | "github",
+  githubToken: process.env.GITHUB_TOKEN,
+  githubRepoUrl: process.env.GITHUB_REPO_URL, // e.g. "https://github.com/org/repo"
+
   ragExtensions: (process.env.RAG_EXTENSIONS ?? ".ts,.js,.tsx,.jsx,.py,.go,.rs,.java,.c,.cpp")
     .split(",")
     .map((ext) => ext.trim()),

@@ -24,6 +24,7 @@ model Ticket {
   rawPayload     Json
   normalized     Json
   relevantFiles  String[] @default([])
+  suggestion     Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

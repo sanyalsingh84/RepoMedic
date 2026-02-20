@@ -49,8 +49,47 @@ export class OllamaAssistant implements AIAssistant {
   }
 
   async generateFix(ticket: NormalizedTicket, contextFiles: { path: string; content: string }[]): Promise<FixSuggestion> {
-    // To be implemented in later step of Phase 2
-    throw new Error("Method not implemented.");
+    const fileSnippets = contextFiles
+      .map(f => `File: ${f.path}\nContent:\n${f.content}\n---`)
+      .join("\n\n");
+
+    const prompt = `
+      You are a senior software engineer. Provide a minimal, scoped code change suggestion to fix the following bug.
+      Do not include unrelated refactors. Prefer diffs.
+
+      Bug Report:
+      - Summary: ${ticket.summary}
+      - Description: ${ticket.description}
+
+      Relevant Source Files:
+      ${fileSnippets}
+
+      Constraints:
+      - Keep changes minimal
+      - Human review required
+
+      Output:
+      - A unified diff (git-style)
+      - No explanations
+      - No markdown fences
+      - No extra commentary
+      - Only the diff
+    `;
+
+    console.log(`🤖 Generating fix for ${ticket.issueKey} using local AI...`);
+    
+    const response = await ollama.generate({
+      model: this.model,
+      prompt: prompt,
+      stream: false,
+      options: {
+        temperature: 0.1,
+      }
+    });
+
+    return {
+      diff: response.response.trim()
+    };
   }
 
   async selectRelevantFiles(ticket: NormalizedTicket, filePaths: string[]): Promise<string[]> {
@@ -87,8 +126,12 @@ export class OllamaAssistant implements AIAssistant {
       
       if (Array.isArray(selected)) {
         files = selected;
-      } else if (selected && typeof selected === "object" && Array.isArray(selected.files)) {
-        files = selected.files;
+      } else if (selected && typeof selected === "object") {
+        if (Array.isArray(selected.files)) {
+          files = selected.files;
+        } else if (Array.isArray(selected.mostRelevantFiles)) {
+          files = selected.mostRelevantFiles;
+        }
       }
       
       return files.slice(0, 3);
